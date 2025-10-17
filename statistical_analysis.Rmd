@@ -1,0 +1,80 @@
+## Statistitical Anlysis for Customer Complaints Topics
+Businesses revieve thousands of unstructured customer complaints every day. Analyzing these complaints can provide valuable insights into customer satisfaction and areas for improvement. In this analysis, we will explore the distribution of sample means using a Monte Carlo simulation approach. Our goal is to turn this raw text data inti actionable insights by identifying which type of complaints leads to the most customer dissatisfaction.  
+
+The primary objective of this analysis is to answer the following question:
+Is there a statistically significant difference in the dispute rate between the complaint topics we discovered?
+
+NLP topic modeling was done using LDA to identify 7 the most common topics in customer complaints. The topics identified were:
+ - "Mortgage & Loan Servicing",        # Topic 0
+ - "Debt Collection Calls",            # Topic 1
+ - "Credit Report Issues",             # Topic 2
+ - "Credit Card Rewards & Promotions", # Topic 3
+ - "Liens & Disputed Re-insertions",   # Topic 4
+ - "General Banking & Card Fees",      # Topic 5
+ - "Legal Actions & Disputes"          # Topic 6
+
+### Data
+The pre-processed data derived form the initial NLP phase. The dataset contains 164,003 records, with each record including the original product category, the assigned dominant topic ID and label, and a binary indicator (disputed_binary) representing the customer's dispute status (1 for Yes, 0 for No).
+
+```{r setup-and-load-data, message=FALSE, warning=FALSE}
+library(tidyverse)
+
+# Read the pre-processed csv data
+labeled_complaints <- read_csv("statistical_analysis_data.csv")
+head(labeled_complaints)
+```
+
+### Exploratory Data Analysis (EDA)
+Before the hypothesis test, we need to see how the topics actually perform. We will group all 164,003 records by topic and calculate the percentage that were disputed for each topic. This gives us a ranked list and allows us to see which topics have the highest dispute rates and which have the lowest.
+
+```{r message=FALSE, warning=FALSE}
+# Grouping, summarizing, and ranking the topics by dispute rate
+topic_summary <- labeled_complaints %>%
+  group_by(topic_label) %>%
+  summarize(
+    n_complaints = n(),
+    n_disputes = sum(disputed_binary),
+    .groups = 'drop') %>%
+  mutate(dispute_rate = n_disputes / n_complaints) %>%
+  arrange(desc(dispute_rate))
+
+# Display the summary table
+print(topic_summary)
+```
+### Visualization of Dispute Rates
+
+```{r visualize-dispute-rates}
+ggplot(data = topic_summary, aes(x = dispute_rate, y = fct_reorder(topic_label, dispute_rate))) +
+  # We add the 'width' argument here to make the bars slimmer.
+  geom_col(fill = "#0072B2", width = 0.7) +
+  labs(
+    title = "Consumer Dispute Rate by Complaint Topic",
+    subtitle = "Analysis of 164,003 CFPB Complaint Narratives",
+    x = "Dispute Rate",
+    y = "Complaint Topic"
+  ) +
+  theme_minimal() +
+  # We can increase the font sizes further for better readability.
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),
+    plot.subtitle = element_text(size = 14),
+    axis.title = element_text(size = 14), # Controls "Dispute Rate" and "Complaint Topic"
+    axis.text = element_text(size = 12)   # Controls the actual labels on the axes
+  )
+```
+
+### Hypothesis Formulation
+
+Based on the exploratory analysis, we have identified the topics with the highest and lowest dispute rates among those with substantial sample sizes. We will conduct our two-proportion z-test to compare the following two groups:
+
+* **Group 1 (High Rate):** `Credit Report Issues`
+* **Group 2 (Low Rate):** `General Banking & Card Fees`
+
+Let $p_1$ be the true population proportion of disputes for `Credit Report Issues`, and $p_2$ be the true proportion for `General Banking & Card Fees`.
+
+Our hypotheses are:
+
+* **Null Hypothesis ($H_0$):** There is no difference in the true dispute rates between the two topics. ($H_0: p_1 - p_2 = 0$)
+* **Alternative Hypothesis ($H_a$):** There is a non-zero difference in the true dispute rates. ($H_a: p_1 - p_2 \neq 0$)
+
+We will test this at a significance level of $\alpha = 0.05$.

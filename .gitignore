@@ -1,0 +1,106 @@
+# Data files (too large for GitHub)
+data/complaints.csv
+data/*_complaints.csv
+*.csv
+!results/statistical_analysis_data.csv  # Keep smaller analysis data
+
+# Processed data files (regenerate from source)
+*.pkl
+*.pickle
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# IPython
+profile_default/
+ipython_config.py
+
+# R
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+.Rproj.user/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating System
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# NLTK data (keep local copy)
+# nltk_data/ - keeping this for reproducibility
+
+# Model outputs (too large)
+*.model
+*.index
+*.state
+*.npy
+
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Output files that can be regenerated
+*.html
+!docs/*.html  # Keep documentation HTML files
