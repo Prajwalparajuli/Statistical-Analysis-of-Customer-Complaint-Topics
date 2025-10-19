@@ -150,6 +150,10 @@ successes <- c(topic_high$n_disputes, topic_low$n_disputes)
 # Creating a vector of the number of trials (total complaints) for each group
 trials <- c(topic_high$n_complaints, topic_low$n_complaints)
 
+observed_proportion_diff <- (topic_high$n_disputes / topic_high$n_complaints) - 
+  (topic_low$n_disputes / topic_low$n_complaints)
+paste("Observed difference in proportions:", observed_proportion_diff)
+
 # Performing the two-proportion z-test
 z_test_result <- prop.test(x= successes, n = trials ,correct = FALSE)
 
