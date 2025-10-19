@@ -1,5 +1,5 @@
-## Statistitical Anlysis for Customer Complaints Topics
-Businesses revieve thousands of unstructured customer complaints every day. Analyzing these complaints can provide valuable insights into customer satisfaction and areas for improvement. In this analysis, we will explore the distribution of sample means using a Monte Carlo simulation approach. Our goal is to turn this raw text data inti actionable insights by identifying which type of complaints leads to the most customer dissatisfaction.  
+## Statistical Analysis for Customer Complaints Topics
+Businesses receive thousands of unstructured customer complaints every day. Analyzing these complaints can provide valuable insights into customer satisfaction and areas for improvement. In this analysis, we will explore the distribution of sample means using a Monte Carlo simulation approach. Our goal is to turn this raw text data into actionable insights by identifying which type of complaints leads to the most customer dissatisfaction.  
 
 The primary objective of this analysis is to answer the following question:
 Is there a statistically significant difference in the dispute rate between the complaint topics we discovered?
@@ -14,10 +14,11 @@ NLP topic modeling was done using LDA to identify 7 the most common topics in cu
  - "Legal Actions & Disputes"          # Topic 6
 
 ### Data
-The pre-processed data derived form the initial NLP phase. The dataset contains 164,003 records, with each record including the original product category, the assigned dominant topic ID and label, and a binary indicator (disputed_binary) representing the customer's dispute status (1 for Yes, 0 for No).
+The pre-processed data derived from the initial NLP phase. The dataset contains 164,003 records, with each record including the original product category, the assigned dominant topic ID and label, and a binary indicator (disputed_binary) representing the customer's dispute status (1 for Yes, 0 for No).
 
 ```{r setup-and-load-data, message=FALSE, warning=FALSE}
 library(tidyverse)
+library(scales)
 
 # Read the pre-processed csv data
 labeled_complaints <- read_csv("statistical_analysis_data.csv")
@@ -27,7 +28,7 @@ head(labeled_complaints)
 ### Exploratory Data Analysis (EDA)
 Before the hypothesis test, we need to see how the topics actually perform. We will group all 164,003 records by topic and calculate the percentage that were disputed for each topic. This gives us a ranked list and allows us to see which topics have the highest dispute rates and which have the lowest.
 
-```{r message=FALSE, warning=FALSE}
+```{r topic-summary, message=FALSE, warning=FALSE}
 # Grouping, summarizing, and ranking the topics by dispute rate
 topic_summary <- labeled_complaints %>%
   group_by(topic_label) %>%
@@ -35,32 +36,68 @@ topic_summary <- labeled_complaints %>%
     n_complaints = n(),
     n_disputes = sum(disputed_binary),
     .groups = 'drop') %>%
-  mutate(dispute_rate = n_disputes / n_complaints) %>%
-  arrange(desc(dispute_rate))
+    mutate(dispute_rate = n_disputes / n_complaints) %>%
+    arrange(desc(dispute_rate))
 
 # Display the summary table
 print(topic_summary)
 ```
 ### Visualization of Dispute Rates
 
-```{r visualize-dispute-rates}
+```{r visualize-dispute-rates, fig.width=10, fig.height=6}
 ggplot(data = topic_summary, aes(x = dispute_rate, y = fct_reorder(topic_label, dispute_rate))) +
-  # We add the 'width' argument here to make the bars slimmer.
   geom_col(fill = "#0072B2", width = 0.7) +
+  geom_text(aes(label = paste0(round(dispute_rate * 100, 1), "%")), 
+            hjust = -0.1, size = 3.5) +
   labs(
     title = "Consumer Dispute Rate by Complaint Topic",
     subtitle = "Analysis of 164,003 CFPB Complaint Narratives",
-    x = "Dispute Rate",
+    x = "Dispute Rate (%)",
     y = "Complaint Topic"
   ) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1), 
+                     expand = expansion(mult = c(0, 0.12))) +
   theme_minimal() +
-  # We can increase the font sizes further for better readability.
   theme(
-    plot.title = element_text(size = 18, face = "bold"),
+    plot.title = element_text(size = 16, face = "bold"),
     plot.subtitle = element_text(size = 14),
-    axis.title = element_text(size = 14), # Controls "Dispute Rate" and "Complaint Topic"
-    axis.text = element_text(size = 12)   # Controls the actual labels on the axes
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 14, face = "bold")
   )
+```
+
+### Visualization of Raw Complaint Counts
+
+```{r stacked-bar-chart, fig.width=10, fig.height=6}
+# Create stacked data and keep n_complaints for ordering
+stacked_data <- topic_summary %>% 
+  mutate(n_non_disputes = n_complaints - n_disputes) %>%
+  select(topic_label, n_complaints, n_disputes, n_non_disputes) %>%
+  pivot_longer(cols = c(n_disputes, n_non_disputes), 
+               names_to = "Dispute_status", 
+               values_to = "Count")
+
+# Plotting the stacked bar chart
+ggplot(data = stacked_data, aes(x = Count, 
+                              y = fct_reorder(topic_label, n_complaints), 
+                              fill = Dispute_status)) +
+    geom_bar(stat = "identity") +
+    labs(
+      title = "Consumer Disputes vs Non-Disputes by Complaint Topic",
+      subtitle = "Analysis of 164,003 CFPB Complaint Narratives",
+      x = "Number of Complaints",
+      y = "Complaint Topic",
+      fill = "Complaint Status"
+    ) +
+    scale_fill_manual(values = c("n_disputes" = "#D55E00", "n_non_disputes" = "#009E73"),
+                      labels = c("Disputed", "Not Disputed")) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 14),
+      axis.title = element_text(size = 14, face = "bold"),
+      axis.text = element_text(size = 14, face = "bold")
+    )
 ```
 
 ### Hypothesis Formulation
@@ -78,3 +115,64 @@ Our hypotheses are:
 * **Alternative Hypothesis ($H_a$):** There is a non-zero difference in the true dispute rates. ($H_a: p_1 - p_2 \neq 0$)
 
 We will test this at a significance level of $\alpha = 0.05$.
+
+### Verifying Test Assumptions
+
+Before proceeding with the two-proportion z-test, it is crucial to verify that our data meets the necessary assumptions.
+
+While a t-test for a *mean* would require checking for normality (often using histograms or Q-Q plots, as seen in the *Black Friday* and *Medicare* sample reports), our test is for *proportions*. This test does not assume the underlying data is normal. Instead, it relies on the **Central Limit Theorem**, which applies if our sample sizes are sufficiently large.
+
+The standard check for this is the **success-failure condition**: each group must contain at least 10 "successes" (disputes) and 10 "failures" (non-disputes).
+
+We can confirm this using our `topic_summary` table for the two groups in our test:
+
+1.  **`Credit Report Issues`:**
+    * **Successes (Disputes):** 9,452
+    * **Failures (Non-Disputes):** 39,298 (total) - 9,452 (disputes) = 29,846
+
+2.  **`General Banking & Card Fees`:**
+    * **Successes (Disputes):** 4,197
+    * **Failures (Non-Disputes):** 24,853 (total) - 4,197 (disputes) = 20,656
+
+Since all these values are in the thousands, they are substantially greater than the 10-count minimum. Our assumptions are confidently met, and we can proceed with the z-test.
+
+### Two-Proportion Z-Test Implementation
+
+```{r two-proportion-z-test, message=FALSE, warning=FALSE}
+
+# Isolating the data for the two topics 
+topic_high <- topic_summary %>% filter(topic_label == "Credit Report Issues")
+topic_low <- topic_summary %>% filter(topic_label == "General Banking & Card Fees")
+
+# Creating a vector of the number of successes (disputes) for each group
+successes <- c(topic_high$n_disputes, topic_low$n_disputes)
+
+# Creating a vector of the number of trials (total complaints) for each group
+trials <- c(topic_high$n_complaints, topic_low$n_complaints)
+
+# Performing the two-proportion z-test
+z_test_result <- prop.test(x= successes, n = trials ,correct = FALSE)
+
+# Displaying the results
+print(z_test_result)
+```
+
+## Interpretation of Statistical Test
+
+The `prop.test()` function returned a **`p-value < 2.2e-16`**. This value is astronomically small, falling far below our pre-defined significance level of $\alpha = 0.05$. This indicates that the probability of observing such a large difference in dispute rates (or larger) purely by random chance is virtually zero.
+
+Based on this overwhelming evidence, we **overwhelmingly reject the null hypothesis ($H_0$)**.
+
+Furthermore, the **95% confidence interval** for the true difference in proportions is `[0.065, 0.078]`. This interval provides two key insights:
+1.  It does **not** contain 0, reinforcing our rejection of the null hypothesis.
+2.  It quantifies the magnitude of the difference. We are 95% confident that the true dispute rate for "Credit Report Issues" is between **6.5% and 7.8%** higher than for "General Banking & Card Fees."
+
+The test confirms that the 7.2% difference we observed in our sample (24.1% vs 16.9%) is a genuine and statistically significant finding.
+
+## Final Conclusion & Recommendation
+
+Our analysis successfully transformed over 160,000 unstructured customer complaints into a clear, data-driven insight. By combining NLP topic modeling with statistical inference, we have a definitive answer to our research question.
+
+We conclude that there is a **highly statistically significant difference** in customer dissatisfaction between complaint topics.
+
+**Recommendation:** The company should **prioritize a root-cause analysis** of its processes related to **"Credit Report Issues."** This topic is not just anecdotally problematic; it is a statistically proven, high-impact driver of customer disputes. We are 95% confident the dispute rate for this area is at least 6.5 percentage points higher than for general banking issues, representing the most critical area for improvement identified in this analysis.
