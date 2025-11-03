@@ -33,11 +33,11 @@ Before the hypothesis test, we need to see how the topics actually perform. We w
 topic_summary <- labeled_complaints %>%
   group_by(topic_label) %>%
   summarize(
-    n_complaints = n(),
-    n_disputes = sum(disputed_binary),
+    Total_Complaints = n(),
+    Disputes = sum(disputed_binary),
     .groups = 'drop') %>%
-    mutate(dispute_rate = n_disputes / n_complaints) %>%
-    arrange(desc(dispute_rate))
+    mutate(Dispute_Rate = Disputes / Total_Complaints) %>%
+    arrange(desc(Dispute_Rate))
 
 # Display the summary table
 print(topic_summary)
@@ -45,9 +45,9 @@ print(topic_summary)
 ### Visualization of Dispute Rates
 
 ```{r visualize-dispute-rates, fig.width=10, fig.height=6}
-ggplot(data = topic_summary, aes(x = dispute_rate, y = fct_reorder(topic_label, dispute_rate))) +
-  geom_col(fill = "#0072B2", width = 0.7) +
-  geom_text(aes(label = paste0(round(dispute_rate * 100, 1), "%")), 
+ggplot(data = topic_summary, aes(x = Dispute_Rate, y = fct_reorder(topic_label, Dispute_Rate))) +
+  geom_col(fill = "lightblue", width = 0.7) +
+  geom_text(aes(label = paste0(round(Dispute_Rate * 100, 1), "%")), 
             hjust = -0.1, size = 3.5) +
   labs(
     title = "Consumer Dispute Rate by Complaint Topic",
@@ -71,15 +71,15 @@ ggplot(data = topic_summary, aes(x = dispute_rate, y = fct_reorder(topic_label, 
 ```{r stacked-bar-chart, fig.width=10, fig.height=6}
 # Create stacked data and keep n_complaints for ordering
 stacked_data <- topic_summary %>% 
-  mutate(n_non_disputes = n_complaints - n_disputes) %>%
-  select(topic_label, n_complaints, n_disputes, n_non_disputes) %>%
-  pivot_longer(cols = c(n_disputes, n_non_disputes), 
+  mutate(n_non_disputes = Total_Complaints - Disputes) %>%
+  select(topic_label, Total_Complaints, Disputes, n_non_disputes) %>%
+  pivot_longer(cols = c(Disputes, n_non_disputes), 
                names_to = "Dispute_status", 
                values_to = "Count")
-
+head(stacked_data)
 # Plotting the stacked bar chart
 ggplot(data = stacked_data, aes(x = Count, 
-                              y = fct_reorder(topic_label, n_complaints), 
+                              y = fct_reorder(topic_label, Total_Complaints), 
                               fill = Dispute_status)) +
     geom_bar(stat = "identity") +
     labs(
@@ -89,18 +89,55 @@ ggplot(data = stacked_data, aes(x = Count,
       y = "Complaint Topic",
       fill = "Complaint Status"
     ) +
-    scale_fill_manual(values = c("n_disputes" = "#D55E00", "n_non_disputes" = "#009E73"),
+    scale_fill_manual(values = c("Disputes" = "#D55E00", "n_non_disputes" = "#009E73"),
                       labels = c("Disputed", "Not Disputed")) +
     theme_minimal() +
     theme(
       plot.title = element_text(size = 16, face = "bold"),
       plot.subtitle = element_text(size = 14),
       axis.title = element_text(size = 14, face = "bold"),
-      axis.text = element_text(size = 14, face = "bold")
+      axis.text = element_text(size = 14, face = "bold") 
     )
 ```
 
-### Hypothesis Formulation
+
+## Is there any statistically significant difference in the dispute rate among our 7 topics?
+
+* **Null Hypothesis ($H_0$):** The proportion of disputes is the same for all 7 topics.
+* **Alternative Hypothesis ($H_a$):** The proportion of disputes is not the same for at least on topic
+
+```{r}
+# Create a contingency table of topic labels and dispute status
+contingency_table <- stacked_data %>%
+  pivot_wider(names_from = Dispute_status, values_from = Count) %>%
+  select(topic_label, Disputes, n_non_disputes)
+print(contingency_table)
+
+# Excluding the first column (topic labels) for the chi-squared test
+observed_chi_squared <- chisq.test(contingency_table[, -1])
+paste("Observed Chi-Squared Statistic:", observed_chi_squared$statistic)
+
+# Create a null distrubution of Chi-Squared statistics via permutation
+set.seed(123)  # For reproducibility
+N <- 10000
+chi_stat <- numeric(N)
+for (i in 1:N) {
+  shuffle <- sample(c(contingency_table$Disputes, contingency_table$n_non_disputes))
+
+plot()
+
+```
+
+
+### Verify Test Assumptions
+...
+
+### Permutation Test for the Chi-Squared statistic
+...
+
+
+
+## What is the magnitude of the differnece in dispute rates between the topics with hightest and lowest dissatisfaction?
 
 Based on the exploratory analysis, we have identified the topics with the highest and lowest dispute rates among those with substantial sample sizes. We will conduct our two-proportion z-test to compare the following two groups:
 
@@ -120,7 +157,7 @@ We will test this at a significance level of $\alpha = 0.05$.
 
 Before proceeding with the two-proportion z-test, it is crucial to verify that our data meets the necessary assumptions.
 
-While a t-test for a *mean* would require checking for normality (often using histograms or Q-Q plots, as seen in the *Black Friday* and *Medicare* sample reports), our test is for *proportions*. This test does not assume the underlying data is normal. Instead, it relies on the **Central Limit Theorem**, which applies if our sample sizes are sufficiently large.
+While a t-test for a *mean* would require checking for normality (often using histograms or Q-Q plots, our test is for *proportions*. This test does not assume the underlying data is normal. Instead, it relies on the **Central Limit Theorem**, which applies if our sample sizes are sufficiently large.
 
 The standard check for this is the **success-failure condition**: each group must contain at least 10 "successes" (disputes) and 10 "failures" (non-disputes).
 
@@ -128,15 +165,15 @@ We can confirm this using our `topic_summary` table for the two groups in our te
 
 1.  **`Credit Report Issues`:**
     * **Successes (Disputes):** 9,452
-    * **Failures (Non-Disputes):** 39,298 (total) - 9,452 (disputes) = 29,846
+    * **Failures (Non-Disputes):** 29,846
 
 2.  **`General Banking & Card Fees`:**
     * **Successes (Disputes):** 4,197
-    * **Failures (Non-Disputes):** 24,853 (total) - 4,197 (disputes) = 20,656
+    * **Failures (Non-Disputes):** 20,656
 
 Since all these values are in the thousands, they are substantially greater than the 10-count minimum. Our assumptions are confidently met, and we can proceed with the z-test.
 
-### Two-Proportion Z-Test Implementation
+### Two-Proportion Z-Test
 
 ```{r two-proportion-z-test, message=FALSE, warning=FALSE}
 
@@ -172,6 +209,21 @@ Furthermore, the **95% confidence interval** for the true difference in proporti
 2.  It quantifies the magnitude of the difference. We are 95% confident that the true dispute rate for "Credit Report Issues" is between **6.5% and 7.8%** higher than for "General Banking & Card Fees."
 
 The test confirms that the 7.2% difference we observed in our sample (24.1% vs 16.9%) is a genuine and statistically significant finding.
+
+## Is there a statistically significant association between a complaint's topics and its product line?
+....
+* **Null Hypothesis ($H_0$):** The topic label and the product are independent (no association)
+* **Alternative Hypothesis ($H_a$):** The topic label and the product are dependent (an assosiation exists)
+...
+
+### Verify Test Assumptions
+...
+
+### Chi-Squared ($X^2$) Test of Independence
+...
+
+
+
 
 ## Final Conclusion & Recommendation
 
